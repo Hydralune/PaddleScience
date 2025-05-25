@@ -222,6 +222,18 @@ PaddleScience 提供了多种第三方库供用户在开发时使用，这些库
         python -m pip install https://paddle-qa.bj.bcebos.com/deepali/whl/latest/dist/hf_deepali-0.1.0-py3-none-any.whl
         ```
 
+    === "neuraloperator"
+
+        ``` sh
+        cd PaddleScience
+        git submodule update --init ppsci/externals/neuraloperator
+        # install from source(recommended)
+        python -m pip install -e ppsci/externals/neuraloperator
+
+        # install from whl
+        python -m pip install https://paddle-qa.bj.bcebos.com/neuraloperator/whl/cuda11.8/latest/dist/neuraloperator-0.3.0-py3-none-any.whl
+        ```
+
     === "open3d"
 
         ``` sh
