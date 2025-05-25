@@ -238,7 +238,7 @@ PaddleScience 提供了多种第三方库供用户在开发时使用，这些库
 
         ``` sh
         cd PaddleScience
-        git submodule update --init ppsci/externals/deepali
+        git submodule update --init ppsci/externals/Open3D
         # install from whl(cuda 118)(recommended)
         python -m pip install https://paddle-qa.bj.bcebos.com/Open3D/whl/cuda11.8/latest/open3d-0.18.0-cp310-cp310-linux_x86_64.whl
         # install from whl(cuda 123)(recommended)
