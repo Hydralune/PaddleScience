@@ -201,7 +201,7 @@ TRAIN:
     ``` sh
     {++CUDA_VISIBLE_DEVICES=3,4,6,7++} \
         python main_parallel.py -cn main_parallel -m seed=42,1024 TRAIN.epochs=10,20 \
-        {++hydra.launcher.n_jobs=4++}"
+        {++hydra.launcher.n_jobs=4++}
     ```
 
     注：设备数和并行任务数可以不相等，但建议单次并行的任务数小于等于设备数。
