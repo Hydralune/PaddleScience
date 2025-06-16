@@ -23,6 +23,7 @@ import hydra
 import utils
 from omegaconf import DictConfig
 from paddle.nn import functional as F
+from paddle.static import InputSpec
 
 import ppsci
 from ppsci.utils import logger
@@ -212,14 +213,91 @@ def evaluate(cfg: DictConfig):
             )
 
 
+def export(cfg: DictConfig):
+    """Export the model for inference."""
+    # initialize logger
+    logger.init_logger("ppsci", osp.join(cfg.output_dir, "export.log"), "info")
+
+    # set model
+    model = ppsci.arch.AMGNet(**cfg.MODEL)
+
+    # initialize solver
+    solver = ppsci.solver.Solver(
+        model,
+        pretrained_model_path=cfg.INFER.pretrained_model_path,
+    )
+
+    # export model
+    input_spec = [
+        {
+            "input": {
+                "node_feat": InputSpec(
+                    [None, cfg.MODEL.input_dim], "float32", name="node_feat"
+                ),
+                "edge_feat": InputSpec([None, 2], "float32", name="edge_feat"),
+            }
+        },
+    ]
+    solver.export(input_spec, cfg.INFER.export_path, skip_prune=True)
+
+
+def inference(cfg: DictConfig):
+    """Run inference with the exported model."""
+    from deploy.python_infer import amgn_predictor
+
+    # initialize logger
+    logger.init_logger("ppsci", osp.join(cfg.output_dir, "infer.log"), "info")
+
+    # set model predictor
+    predictor = amgn_predictor.AMGNPredictor(cfg)
+
+    # set dataloader
+    eval_dataloader_cfg = {
+        "dataset": {
+            "name": "MeshCylinderDataset",
+            "input_keys": ("input",),
+            "label_keys": ("label",),
+            "data_dir": cfg.EVAL_DATA_DIR,
+            "mesh_graph_path": cfg.EVAL_MESH_GRAPH_PATH,
+        },
+        "batch_size": 1,
+        "sampler": {
+            "name": "BatchSampler",
+            "drop_last": False,
+            "shuffle": False,
+        },
+    }
+    eval_dataloader = ppsci.data.build_dataloader(**eval_dataloader_cfg)
+
+    # run inference
+    logger.message("Now running inference, please wait...")
+    for index, (input_, label, _) in enumerate(eval_dataloader):
+        output_dict = predictor.predict(input_, cfg.INFER.batch_size)
+        truefield = label["label"].y
+        utils.log_images(
+            input_["input"].pos,
+            output_dict["pred"],
+            truefield,
+            eval_dataloader.dataset.elems_list,
+            index,
+            "cylinder_infer",
+        )
+
+
 @hydra.main(version_base=None, config_path="./conf", config_name="amgnet_cylinder.yaml")
 def main(cfg: DictConfig):
     if cfg.mode == "train":
         train(cfg)
     elif cfg.mode == "eval":
         evaluate(cfg)
+    elif cfg.mode == "export":
+        export(cfg)
+    elif cfg.mode == "infer":
+        inference(cfg)
     else:
-        raise ValueError(f"cfg.mode should in ['train', 'eval'], but got '{cfg.mode}'")
+        raise ValueError(
+            f"cfg.mode should in ['train', 'eval', 'export', 'infer'], but got '{cfg.mode}'"
+        )
 
 
 if __name__ == "__main__":
