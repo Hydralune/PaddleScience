@@ -215,9 +215,6 @@ def evaluate(cfg: DictConfig):
 
 def export(cfg: DictConfig):
     """Export the model for inference."""
-    # initialize logger
-    logger.init_logger("ppsci", osp.join(cfg.output_dir, "export.log"), "info")
-
     # set model
     model = ppsci.arch.AMGNet(**cfg.MODEL)
 
