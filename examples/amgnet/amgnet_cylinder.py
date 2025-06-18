@@ -241,10 +241,6 @@ def export(cfg: DictConfig):
 def inference(cfg: DictConfig):
     """Run inference with the exported model."""
     import amgn_predictor
-
-    # initialize logger
-    logger.init_logger("ppsci", osp.join(cfg.output_dir, "infer.log"), "info")
-
     # set model predictor
     predictor = amgn_predictor.AMGNPredictor(cfg)
 
