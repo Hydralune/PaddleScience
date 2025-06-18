@@ -235,7 +235,7 @@ def export(cfg: DictConfig):
             }
         },
     ]
-    solver.export(input_spec, cfg.INFER.export_path, skip_prune=True)
+    solver.export(input_spec, cfg.INFER.export_path)
 
 
 def inference(cfg: DictConfig):
