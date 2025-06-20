@@ -16,4 +16,4 @@ from __future__ import annotations
 
 from ppsci.deploy.base_predictor import Predictor
 
-__all__ = ["Predictor"] 
+__all__ = ["Predictor"]
