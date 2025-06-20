@@ -225,39 +225,39 @@ def export(cfg: DictConfig):
         pretrained_model_path=cfg.INFER.pretrained_model_path,
     )
 
-    # 创建一个简化但保留原始功能的导出模型
+    # Create simplified export model
     class SimpleExportModel(nn.Layer):
         def __init__(self, original_model):
             super(SimpleExportModel, self).__init__()
             self.output_keys = original_model.output_keys
 
-            # 只保留原始模型的关键组件，不添加额外复杂层
+            # Extract core components from original model
             self.node_encoder = original_model.encoder.node_model
             self.post_processor = original_model.post_processor
             self.decoder = original_model.decoder
 
         def forward(self, node_feat):
-            """简单直接的前向传递，尽量接近原始模型但避免PGL依赖"""
-            # 1. 节点特征编码
+            """Forward pass that avoids PGL dependencies"""
+            # 1. Node feature encoding
             encoded_features = self.node_encoder(node_feat)
 
-            # 2. 由于无法完全复制原始的processor操作，直接使用后处理器
+            # 2. Apply post-processing
             processed_features = self.post_processor(encoded_features)
 
-            # 3. 应用解码器获得最终输出
+            # 3. Apply decoder to get final output
             output = self.decoder(processed_features)
 
             return {self.output_keys[0]: output}
 
-    # 创建简化导出模型
+    # Create export model
     export_model = SimpleExportModel(model)
 
-    # 配置导出选项
+    # Configure export options
     input_spec = [
         InputSpec(shape=[None, cfg.MODEL.input_dim], dtype="float32", name="node_feat"),
     ]
 
-    # 导出模型
+    # Export model
     solver.export(input_spec, cfg.INFER.export_path, to_func=export_model.forward)
 
 
