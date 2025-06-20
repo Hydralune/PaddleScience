@@ -642,12 +642,13 @@ class AMGNet(nn.Layer):
         """
         # Create PGL graph with provided features
         import pgl
+
         graph = pgl.Graph(num_nodes=node_feat.shape[0], edges=[[0, 0]])  # Dummy edge
         graph.x = node_feat
         graph.edge_attr = edge_feat
         graph.pos = node_feat[:, :2]  # Use first two dims as position
         graph.edge_index = paddle.to_tensor([[0], [0]])  # Dummy edge index
-        
+
         # Process with regular forward
         latent_graph = self.encoder(graph)
         x, p = self.processor(latent_graph, speed=self.speed)

@@ -16,6 +16,7 @@ from ppsci import arch  # isort:skip
 from ppsci import autodiff  # isort:skip
 from ppsci import constraint  # isort:skip
 from ppsci import data  # isort:skip
+from ppsci import deploy  # isort:skip
 from ppsci import equation  # isort:skip
 from ppsci import geometry  # isort:skip
 from ppsci import loss  # isort:skip
@@ -45,6 +46,7 @@ __all__ = [
     "autodiff",
     "constraint",
     "data",
+    "deploy",
     "equation",
     "geometry",
     "loss",

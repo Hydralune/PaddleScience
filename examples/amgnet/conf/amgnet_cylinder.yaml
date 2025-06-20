@@ -72,11 +72,11 @@ INFER:
   # Model export settings
   export_path: "./inference/amgnet_cylinder"
   pretrained_model_path: "/root/.paddlesci/weights/amgnet_cylinder_pretrained.pdparams"
-  
+
   # Performance settings
   use_mkldnn: true
   ir_optim: true
-  
+
   # Analysis settings
   analyze_results: true
   visualize_comparison: true

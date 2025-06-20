@@ -14,26 +14,23 @@
 
 from __future__ import annotations
 
-import os
 from os import path as osp
 from typing import TYPE_CHECKING
 from typing import Dict
 from typing import List
 
 import hydra
+import paddle
+import paddle.nn as nn
 import utils
 from omegaconf import DictConfig
 from paddle.nn import functional as F
 from paddle.static import InputSpec
-import paddle
-import paddle.nn as nn
-import numpy as np
 
 import ppsci
 from ppsci.utils import logger
 
 if TYPE_CHECKING:
-    import paddle
     import pgl
 
 
@@ -233,37 +230,33 @@ def export(cfg: DictConfig):
         def __init__(self, original_model):
             super(SimpleExportModel, self).__init__()
             self.output_keys = original_model.output_keys
-            
+
             # 只保留原始模型的关键组件，不添加额外复杂层
             self.node_encoder = original_model.encoder.node_model
             self.post_processor = original_model.post_processor
             self.decoder = original_model.decoder
-            
+
         def forward(self, node_feat):
             """简单直接的前向传递，尽量接近原始模型但避免PGL依赖"""
             # 1. 节点特征编码
             encoded_features = self.node_encoder(node_feat)
-            
+
             # 2. 由于无法完全复制原始的processor操作，直接使用后处理器
             processed_features = self.post_processor(encoded_features)
-            
+
             # 3. 应用解码器获得最终输出
             output = self.decoder(processed_features)
-            
+
             return {self.output_keys[0]: output}
-    
+
     # 创建简化导出模型
     export_model = SimpleExportModel(model)
-    
+
     # 配置导出选项
     input_spec = [
-        InputSpec(
-            shape=[None, cfg.MODEL.input_dim],
-            dtype="float32",
-            name="node_feat"
-        ),
+        InputSpec(shape=[None, cfg.MODEL.input_dim], dtype="float32", name="node_feat"),
     ]
-    
+
     # 导出模型
     solver.export(input_spec, cfg.INFER.export_path, to_func=export_model.forward)
 
@@ -271,9 +264,10 @@ def export(cfg: DictConfig):
 def infer(cfg: DictConfig):
     """Infer using the trained model."""
     import os
+
     import amgnet_predictor
     import numpy as np
-    
+
     # Create data loader
     _, dataset = utils.create_dataset(cfg)
     logger.message("Building dataset...")
@@ -282,7 +276,7 @@ def infer(cfg: DictConfig):
     # Create AMGNPredictor
     logger.message("Getting first sample from dataset...")
     sample = dataset[0]
-    
+
     # Debug dataset structure
     logger.message(f"Sample type: {type(sample)}")
     if isinstance(sample, tuple) and len(sample) >= 3:
@@ -290,40 +284,40 @@ def infer(cfg: DictConfig):
         logger.message(f"Input data type: {type(input_data)}")
         logger.message(f"Label data type: {type(label_data)}")
         logger.message(f"Meta data type: {type(meta)}")
-        
+
         if isinstance(input_data, dict):
             for k, v in input_data.items():
                 logger.message(f"Input key: {k}, value type: {type(v)}")
-                if hasattr(v, 'x'):
+                if hasattr(v, "x"):
                     logger.message(f"  Has attribute x: {type(v.x)}")
                 elif isinstance(v, np.ndarray):
                     logger.message(f"  Is numpy array with shape: {v.shape}")
     else:
         logger.message(f"Unexpected sample structure: {sample}")
         return
-    
+
     # Extract node features safely
     try:
         graph = input_data["input"]
         logger.message(f"Graph type: {type(graph)}")
-        
+
         # Handle different types of graph.x
-        if hasattr(graph, 'x'):
+        if hasattr(graph, "x"):
             node_feat = graph.x
-            if hasattr(node_feat, 'numpy'):
+            if hasattr(node_feat, "numpy"):
                 node_feat = node_feat.numpy()
             logger.message(f"Node features shape: {node_feat.shape}")
         else:
             # If graph is already a numpy array
             node_feat = graph
             logger.message(f"Using graph directly as node features: {node_feat.shape}")
-            
+
         # Handle different types of label data
         if isinstance(label_data, dict) and "label" in label_data:
             label = label_data["label"]
-            if hasattr(label, 'y'):
+            if hasattr(label, "y"):
                 ground_truth = label.y
-                if hasattr(ground_truth, 'numpy'):
+                if hasattr(ground_truth, "numpy"):
                     ground_truth = ground_truth.numpy()
             else:
                 ground_truth = label
@@ -331,18 +325,20 @@ def infer(cfg: DictConfig):
         else:
             logger.message("Could not extract ground truth data")
             return
-            
+
         # Handle different types of coordinates
-        if hasattr(graph, 'pos'):
+        if hasattr(graph, "pos"):
             coords = graph.pos
-            if hasattr(coords, 'numpy'):
+            if hasattr(coords, "numpy"):
                 coords = coords.numpy()
             logger.message(f"Coordinates shape: {coords.shape}")
         else:
             # Use first two columns of node_feat as coordinates if available
             if node_feat.shape[1] >= 2:
                 coords = node_feat[:, :2]
-                logger.message(f"Using first two columns of node_feat as coordinates: {coords.shape}")
+                logger.message(
+                    f"Using first two columns of node_feat as coordinates: {coords.shape}"
+                )
             else:
                 # Generate dummy coordinates
                 coords = np.zeros((node_feat.shape[0], 2))
@@ -350,12 +346,13 @@ def infer(cfg: DictConfig):
     except Exception as e:
         logger.message(f"Error extracting features: {e}")
         import traceback
+
         logger.message(traceback.format_exc())
         return
-    
+
     # Create directory for result
     os.makedirs("./result/image/cylinder_infer", exist_ok=True)
-    
+
     # Initialize predictor
     predictor = amgnet_predictor.AMGNPredictor(
         model_path=cfg.INFER.export_path,
@@ -365,22 +362,22 @@ def infer(cfg: DictConfig):
         },
         verbose=True,
     )
-    
+
     logger.message("Running inference on sample...")
-    
+
     # Run inference
     output = predictor.predict({"node_feat": node_feat})
-    
+
     logger.message("Generating visualization...")
-    
+
     # Compare prediction with ground truth
     pred_result = output["pred"]
-    
+
     # Extract elements list if available
     elems_list = None
-    if hasattr(meta, 'get'):
+    if hasattr(meta, "get"):
         elems_list = meta.get("elems_list", None)
-    
+
     # Visualize using the original method
     utils.log_images(
         coords,
@@ -390,8 +387,8 @@ def infer(cfg: DictConfig):
         0,  # Sample index
         "cylinder_infer",
     )
-    
-    logger.message(f"Visualization saved to ./result/image/cylinder_infer")
+
+    logger.message("Visualization saved to ./result/image/cylinder_infer")
 
 
 @hydra.main(version_base=None, config_path="./conf", config_name="amgnet_cylinder.yaml")
