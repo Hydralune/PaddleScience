@@ -628,6 +628,33 @@ class AMGNet(nn.Layer):
         pred_field = self.decoder(node_features)
         return {self.output_keys[0]: pred_field}
 
+    def forward_export(self, node_feat, edge_feat):
+        """Forward pass for export mode.
+
+        Simplified forward function designed for exported model to avoid direct PGL usage.
+
+        Args:
+            node_feat: Node feature tensor.
+            edge_feat: Edge feature tensor.
+
+        Returns:
+            Dict[str, paddle.Tensor]: Dictionary containing prediction results.
+        """
+        # Create PGL graph with provided features
+        import pgl
+        graph = pgl.Graph(num_nodes=node_feat.shape[0], edges=[[0, 0]])  # Dummy edge
+        graph.x = node_feat
+        graph.edge_attr = edge_feat
+        graph.pos = node_feat[:, :2]  # Use first two dims as position
+        graph.edge_index = paddle.to_tensor([[0], [0]])  # Dummy edge index
+        
+        # Process with regular forward
+        latent_graph = self.encoder(graph)
+        x, p = self.processor(latent_graph, speed=self.speed)
+        node_features = self._spa_compute(x, p)
+        pred_field = self.decoder(node_features)
+        return {self.output_keys[0]: pred_field}
+
     def _make_mlp(self, output_dim: int, input_dim: int = 5, layer_norm: bool = True):
         widths = (self._latent_dim,) * self._num_layers + (output_dim,)
         network = FullyConnectedLayer(input_dim, widths)
