@@ -893,19 +893,20 @@ class Solver:
     @misc.run_on_eval_mode
     def export(
         self,
-        input_spec: List[Dict[str, InputSpec]],
+        input_spec: List[Union[Dict[str, InputSpec], InputSpec]],
         export_path: str,
         with_onnx: bool = False,
         skip_prune_program: bool = False,
         *,
         full_graph: bool = True,
         ignore_modules: Optional[List[ModuleType]] = None,
+        to_func: Optional[Callable] = None,
     ):
         """
         Convert model to static graph model and export to files.
 
         Args:
-            input_spec (List[Dict[str, InputSpec]]): InputSpec describes the signature
+            input_spec (List[Union[Dict[str, InputSpec], InputSpec]]): InputSpec describes the signature
                 information of the model input.
             export_path (str): The path prefix to save model.
             with_onnx (bool, optional): Whether to export model into onnx after
@@ -919,6 +920,8 @@ class Solver:
                 conversion. Builtin modules that have been ignored are collections, pdb,
                 copy, inspect, re, numpy, logging, six. For example, einops can be added
                 here. Defaults to None.
+            to_func (Optional[Callable]): Function to be exported, if provided will be used instead of model.forward.
+                Defaults to None.
         """
         if ignore_modules is not None:
             jit.ignore_module(ignore_modules)
@@ -931,9 +934,18 @@ class Solver:
                 "model will be random initialized."
             )
 
+        # Check if to_func is provided
+        if to_func is not None:
+            forward_func = to_func
+        # Check if model has a forward_export method
+        elif hasattr(self.model, "forward_export"):
+            forward_func = self.model.forward_export
+        else:
+            forward_func = self.model.forward
+
         # convert model to static graph model
         static_model = jit.to_static(
-            self.model,
+            forward_func,
             input_spec=input_spec,
             full_graph=full_graph,
         )

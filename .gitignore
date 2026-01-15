@@ -132,3 +132,8 @@ FETCH_HEAD
 
 # auto generated version file by setuptools_scm
 ppsci/_version.py
+examples/amgnet/data/
+examples/amgnet/data.zip
+examples/amgnet/inference/
+examples/amgnet/result/
+examples/amgnet/outputs_amgnet_*/

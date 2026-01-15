@@ -30,7 +30,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import paddle
-from paddle.vision import transforms as T
 from PIL import Image
 
 matplotlib.use("Agg")
@@ -140,133 +139,112 @@ def save_image(
     im.save(fp, format=format)
 
 
-def log_images(
-    nodes,
-    pred,
-    true,
-    elems_list,
-    index,
-    mode,
-    aoa=0,
-    mach=0,
-    file="field.png",
-):
-    for field in range(pred.shape[1]):
-        true_img = plot_field(
-            nodes,
-            elems_list,
-            true[:, field],
-            mode=mode,
-            col=field,
-            clim=(-0.8, 0.8),
-            title="true",
-        )
-        true_img = T.ToTensor()(true_img)
+def log_images(nodes, pred_field, true_field, elems_list, idx, mode="cylinder"):
+    """Log images for visualization."""
+    import os
 
-        pred_img = plot_field(
-            nodes,
-            elems_list,
-            pred[:, field],
-            mode=mode,
-            col=field,
-            clim=(-0.8, 0.8),
-            title="pred",
-        )
-        pred_img = T.ToTensor()(pred_img)
-        imgs = [pred_img, true_img]
-        grid = make_grid(paddle.stack(imgs), padding=0)
-        out_file = file + f"{field}"
-        if mode == "airfoil":
-            if aoa == 8.0 and mach == 0.65:
-                save_image(
-                    grid, "./result/image/" + str(index) + out_file + "_field.png"
-                )
-            save_image(
-                grid, "./result/image/airfoil/" + str(index) + out_file + "_field.png"
-            )
-        elif mode == "cylinder":
-            if aoa == 39.0:
-                save_image(
-                    grid, "./result/image/" + str(index) + out_file + "_field.png"
-                )
-            save_image(
-                grid, "./result/image/cylinder/" + str(index) + out_file + "_field.png"
-            )
-        else:
-            raise ValueError(
-                f"Argument 'mode' should be 'airfoil' or 'cylinder', but got {mode}."
-            )
+    import matplotlib.pyplot as plt
+
+    # 确保结果目录存在
+    result_dir = os.path.join("./result/image", mode)
+    os.makedirs(result_dir, exist_ok=True)
+
+    # 如果是paddle.Tensor，转换为numpy
+    if not isinstance(pred_field, np.ndarray):
+        pred_field = pred_field.numpy()
+    if not isinstance(true_field, np.ndarray):
+        true_field = true_field.numpy()
+
+    # 压力场
+    p_true = true_field[:, 0]
+    p_pred = pred_field[:, 0]
+
+    # 速度x分量
+    vx_true = true_field[:, 1]
+    vx_pred = pred_field[:, 1]
+
+    # 速度y分量
+    vy_true = true_field[:, 2]
+    vy_pred = pred_field[:, 2]
+
+    # 处理图形数据
+    elems = sum(elems_list, []) if elems_list else None
+
+    # 保存压力场图像
+    fig_p_true = plot_field(nodes, p_true, elems)
+    plt.title("True Pressure")
+    plt.savefig(os.path.join(result_dir, f"p_true_{idx}.png"))
+    plt.close(fig_p_true)
+
+    fig_p_pred = plot_field(nodes, p_pred, elems)
+    plt.title("Predicted Pressure")
+    plt.savefig(os.path.join(result_dir, f"p_pred_{idx}.png"))
+    plt.close(fig_p_pred)
+
+    # 保存x方向速度场图像
+    fig_vx_true = plot_field(nodes, vx_true, elems)
+    plt.title("True X-Velocity")
+    plt.savefig(os.path.join(result_dir, f"vx_true_{idx}.png"))
+    plt.close(fig_vx_true)
+
+    fig_vx_pred = plot_field(nodes, vx_pred, elems)
+    plt.title("Predicted X-Velocity")
+    plt.savefig(os.path.join(result_dir, f"vx_pred_{idx}.png"))
+    plt.close(fig_vx_pred)
+
+    # 保存y方向速度场图像
+    fig_vy_true = plot_field(nodes, vy_true, elems)
+    plt.title("True Y-Velocity")
+    plt.savefig(os.path.join(result_dir, f"vy_true_{idx}.png"))
+    plt.close(fig_vy_true)
+
+    fig_vy_pred = plot_field(nodes, vy_pred, elems)
+    plt.title("Predicted Y-Velocity")
+    plt.savefig(os.path.join(result_dir, f"vy_pred_{idx}.png"))
+    plt.close(fig_vy_pred)
+
+    print(f"Saved visualization to {result_dir}")
 
 
-def plot_field(
-    nodes: paddle.Tensor,
-    elems_list,
-    field: paddle.Tensor,
-    mode,
-    col,
-    contour=False,
-    clim=None,
-    zoom=True,
-    get_array=True,
-    out_file=None,
-    show=False,
-    title="",
-):
-    elems_list = sum(elems_list, [])
-    tris, _ = quad2tri(elems_list)
-    tris = np.array(tris)
-    x, y = nodes[:, :2].t().detach().numpy()
-    field = field.detach().numpy()
-    fig = plt.figure(dpi=800)
-    if contour:
-        plt.tricontourf(x, y, tris, field)
+def plot_field(nodes, field, elems, vmin=None, vmax=None):
+    """Plot heatmap for scalar field in nodes."""
+    fig = plt.figure(figsize=(20, 10))
+
+    # 检查nodes的类型并适当处理
+    if isinstance(nodes, np.ndarray):
+        x, y = nodes[:, 0], nodes[:, 1]  # 直接获取x和y坐标
     else:
-        plt.tripcolor(x, y, tris, field)
-    if clim:
-        plt.clim(*clim)
-    colorbar = plt.colorbar()
-    if mode == "airfoil":
-        if col == 0:
-            colorbar.set_label("x-velocity", fontsize=16)
-        elif col == 1:
-            colorbar.set_label("pressure", fontsize=16)
-        elif col == 2:
-            colorbar.set_label("y-velocity", fontsize=16)
-    if mode == "cylinder":
-        if col == 0:
-            colorbar.set_label("pressure", fontsize=16)
-        elif col == 1:
-            colorbar.set_label("x-velocity", fontsize=16)
-        elif col == 2:
-            colorbar.set_label("y-velocity", fontsize=16)
-    if zoom:
-        if mode == "airfoil":
-            plt.xlim(left=-0.5, right=1.5)
-            plt.ylim(bottom=-0.5, top=0.5)
-        else:
-            plt.xlim(left=-5, right=5.0)
-            plt.ylim(bottom=-5, top=5.0)
+        # 如果是paddle.Tensor或其他支持t()的对象
+        x, y = nodes[:, :2].t().detach().numpy()
 
-    if title:
-        plt.title(title)
+    # 检查field的类型并适当处理
+    if isinstance(field, np.ndarray):
+        value = field
+    else:
+        # 如果是paddle.Tensor或其他需要detach的对象
+        value = field.detach().numpy()
 
-    if out_file is not None:
-        plt.savefig(out_file)
-        plt.close()
+    # 创建三角形单元格
+    triangles = []
+    if elems is not None:
+        for cell in elems:
+            if len(cell) == 3:
+                triangles.append([cell[0], cell[1], cell[2]])
+            elif len(cell) == 4:
+                triangles.append([cell[0], cell[1], cell[2]])
+                triangles.append([cell[0], cell[2], cell[3]])
 
-    if show:
-        plt.show()
+    if len(triangles) > 0:
+        plt.tricontourf(x, y, triangles, value, 100, cmap="jet", vmin=vmin, vmax=vmax)
+    else:
+        plt.tricontourf(x, y, value, 100, cmap="jet", vmin=vmin, vmax=vmax)
+    plt.colorbar()
+    plt.axes().set_aspect("equal")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.tight_layout()
 
-    if get_array:
-        if mode == "airfoil":
-            plt.gca().invert_yaxis()
-        fig.canvas.draw()
-        array = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        array = array.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-        fig.clf()
-        fig.clear()
-        plt.close()
-        return array
+    return fig
 
 
 def quad2tri(elems):
@@ -285,3 +263,97 @@ def quad2tri(elems):
         else paddle.to_tensor([], dtype=paddle.int64)
     )
     return new_elems, new_edges
+
+
+def create_dataset(cfg):
+    """Create dataset for inference.
+
+    Args:
+        cfg: Configuration object.
+
+    Returns:
+        data_loader, dataset: Tuple containing data loader and dataset.
+    """
+    from ppsci.data import dataset
+
+    # Create dataset
+    eval_dataset = dataset.MeshCylinderDataset(
+        input_keys=("input",),
+        label_keys=("label",),
+        data_dir=cfg.EVAL_DATA_DIR,
+        mesh_graph_path=cfg.EVAL_MESH_GRAPH_PATH,
+    )
+
+    return None, eval_dataset
+
+
+def visualize_result(data, save_path, channel_names=None):
+    """Visualize prediction results.
+
+    Args:
+        data: Dictionary containing 'pred' and 'true' fields.
+        save_path: Path to save visualizations.
+        channel_names: List of channel names.
+    """
+    if channel_names is None:
+        channel_names = ["p", "vx", "vy"]
+
+    # Ensure directory exists
+    os.makedirs(save_path, exist_ok=True)
+
+    # Get prediction and ground truth
+    pred = data["pred"]
+    true = data["true"]
+
+    # Visualize each channel
+    for i, name in enumerate(channel_names):
+        if i >= pred.shape[1]:
+            continue
+
+        # Plot ground truth heatmap
+        plt.figure(figsize=(10, 8))
+        plt.imshow(true[:, i].reshape(-1, 1), cmap="viridis", aspect="auto")
+        plt.colorbar()
+        plt.title(f"True {name}")
+        plt.savefig(os.path.join(save_path, f"{name}_true_0.png"))
+        plt.close()
+
+        # Plot prediction heatmap
+        plt.figure(figsize=(10, 8))
+        plt.imshow(pred[:, i].reshape(-1, 1), cmap="viridis", aspect="auto")
+        plt.colorbar()
+        plt.title(f"Predicted {name}")
+        plt.savefig(os.path.join(save_path, f"{name}_pred_0.png"))
+        plt.close()
+
+
+def graph_collate_fn(batch):
+    """自定义的collate函数，用于处理包含图对象的批次数据。
+
+    Args:
+        batch: 批次数据，每个元素是一个样本
+
+    Returns:
+        处理后的批次数据
+    """
+    input_dict = {}
+    label_dict = {}
+    meta_dict = {}
+
+    # 对于每个样本
+    for sample in batch:
+        for k, v in sample[0].items():
+            if k not in input_dict:
+                input_dict[k] = []
+            input_dict[k].append(v)
+
+        for k, v in sample[1].items():
+            if k not in label_dict:
+                label_dict[k] = []
+            label_dict[k].append(v)
+
+        meta_dict_sample = sample[2]
+        if not meta_dict:
+            meta_dict = meta_dict_sample
+
+    return input_dict, label_dict, meta_dict

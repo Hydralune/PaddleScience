@@ -56,6 +56,22 @@
         python amgnet_cylinder.py mode=eval EVAL.pretrained_model_path=https://paddle-org.bj.bcebos.com/paddlescience/models/amgnet/amgnet_cylinder_pretrained.pdparams
         ```
 
+=== "模型导出命令"
+
+    === "amgnet_cylinder"
+
+        ``` sh
+        python amgnet_cylinder.py mode=export
+        ```
+
+=== "Python推理命令"
+
+    === "amgnet_cylinder"
+
+        ``` sh
+        python amgnet_cylinder.py mode=infer
+        ```
+
 | 预训练模型  | 指标 |
 |:--| :--|
 | [amgnet_airfoil_pretrained.pdparams](https://paddle-org.bj.bcebos.com/paddlescience/models/amgnet/amgnet_airfoil_pretrained.pdparams) | loss(RMSE_validator): 0.0001 <br> RMSE.RMSE(RMSE_validator): 0.01315 |
@@ -290,6 +306,64 @@ unzip data.zip
     examples/amgnet/amgnet_cylinder.py:138:151
     --8<--
     ```
+
+### 3.9 模型导出与推理
+
+训练完成后，我们可以将模型导出为静态图格式，并使用Python推理引擎进行部署。
+
+#### 3.9.1 导出模型
+
+我们首先需要在 `amgnet_cylinder.py` 中实现 `export` 函数，它负责加载训练好的模型，并将其保存为推理所需的格式。
+
+``` py linenums="235"
+--8<--
+examples/amgnet/amgnet_cylinder.py:235:256
+--8<--
+```
+
+通过运行以下命令，即可执行导出：
+
+```bash
+python amgnet_cylinder.py mode=export
+```
+
+导出的模型将包含 `amgnet_cylinder.pdmodel` (模型结构) 和 `amgnet_cylinder.pdiparams` (模型权重) 文件，保存在配置文件 `INFER.export_path` 所指定的目录中。
+
+#### 3.9.2 创建推理器
+
+为了执行推理，我们创建了一个专用的 `AMGNPredictor` 类，存放于 `deploy/python_infer/amgn_predictor.py`。这个类继承自 `ppsci.deploy.base_predictor.Predictor`，并实现了加载模型和执行预测的核心逻辑。
+
+``` py linenums="28"
+--8<--
+examples/amgnet/deploy/python_infer/amgn_predictor.py:28:87
+--8<--
+```
+
+#### 3.9.3 执行推理
+
+最后，我们实现 `inference` 函数。该函数会实例化 `AMGNPredictor`，加载数据，并循环执行预测，最后将结果可视化。
+
+``` py linenums="259"
+--8<--
+examples/amgnet/amgnet_cylinder.py:259:298
+--8<--
+```
+
+通过以下命令来运行推理：
+
+```bash
+python amgnet_cylinder.py mode=infer
+```
+
+#### 3.9.4 新增配置
+
+为了支持以上功能，需要在 `conf/amgnet_cylinder.yaml` 中添加 `INFER` 配置项。
+
+``` yaml linenums="65"
+--8<--
+examples/amgnet/conf/amgnet_cylinder.yaml:65:68
+--8<--
+```
 
 ## 4. 完整代码
 
